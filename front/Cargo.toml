@@ -1,0 +1,27 @@
+[package]
+name = "jwordlist-front"
+version = "0.1.0"
+authors = ["Victor Nivet <victor@saumon.ninja>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+jmdict = { path = "../jmdict", default-features = false }
+wasm-bindgen = { version = "0.2", features = ["serde-serialize"] }
+typed-html = "0.2.1"
+wasm-bindgen-futures = "0.3"
+js-sys = "0.3"
+futures = "0.1"
+url = "2.1"
+console_error_panic_hook = "0.1"
+
+[dependencies.web-sys]
+version = "0.3"
+features = [
+    "console",
+    "Window", "Document", "HtmlElement", "Element", "Node",
+    "DomParser", "SupportedType", "HtmlCollection",
+    "Headers", "Request", "RequestInit", "RequestMode", "Response",
+]

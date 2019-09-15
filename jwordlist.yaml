@@ -1,0 +1,2 @@
+jmdict_filename: "JMdict.gz"
+listen_bind: "127.0.0.1:11000"
