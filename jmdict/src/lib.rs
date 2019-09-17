@@ -21,12 +21,12 @@ pub fn with_jmdict_gz_entries<
     reader: R,
     entries_ids: I,
     on_entry: F,
-) {
+) -> usize {
     use flate2::read::GzDecoder;
     use std::io::BufReader;
     let gz_reader = GzDecoder::new(reader);
     let buf_gz_reader = BufReader::new(gz_reader);
-    with_jmdict_entries(buf_gz_reader, entries_ids, on_entry);
+    with_jmdict_entries(buf_gz_reader, entries_ids, on_entry)
 }
 
 fn lookup_entry_id<'a, F: Fn(&JMDictEntryId<'a>) -> bool>(

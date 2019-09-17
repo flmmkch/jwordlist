@@ -4,51 +4,28 @@ use web_sys::{Request, RequestInit, RequestMode, Response};
 use wasm_bindgen_futures::JsFuture;
 use futures::future::Future;
 use jmdict::prelude::*;
-use js_sys::Promise;
 use wasm_bindgen::JsCast;
 use std::panic;
+mod loading;
+use self::loading::JWordListLoading;
 
 // Called when the wasm module is instantiated
 #[wasm_bindgen(start)]
 pub fn main() -> Result<(), JsValue> {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
+    initialize_app()?;
     Ok(())
 }
 
-#[wasm_bindgen]
-pub fn get_all_kanji() -> Result<Promise, JsValue> {
-    let mut opts = RequestInit::new();
-    opts.method("GET");
-    opts.mode(RequestMode::SameOrigin);
-
-    let request = Request::new_with_str_and_init(
-        "/api/get_all_kanji",
-        &opts,
-    )?;
-
-    request
-        .headers()
-        .set("Accept", "application/json")?;
-    let window = web_sys::window().expect("no global `window` exists");
-    let request_future = JsFuture::from(window.fetch_with_request(&request));
-    let js_future = request_future
-        .and_then(|resp_value| {
-            // `resp_value` is a `Response` object.
-            assert!(resp_value.is_instance_of::<Response>());
-            let resp: Response = resp_value.dyn_into().unwrap();
-            resp.json()
-        })
-        .and_then(|json_value: js_sys::Promise| {
-            web_sys::console::log_1(&"GET KANJI 3".into());
-            // Convert this other `Promise` into a rust `Future`.
-            JsFuture::from(json_value)
-        })
-        .and_then(|json| {
+pub fn initialize_app() -> Result<(), JsValue> {
+    let js_future = get_words(vec!["言葉", "辞典", "映画館"])?
+        .and_then(|entry_list| {
             use typed_html::{html, text};
-            // Use serde to parse the JSON into a struct.
-            let entry_list: Vec<JMDictEntry> = json.into_serde().unwrap();
             let window = web_sys::window().expect("no global window exists");
             let document = window.document().expect("no window document found");
+            let word_list_container = document.get_element_by_id("word-list-container").expect("No \"word-list-container\" element found");
+            word_list_container.class_list().remove_1("scale-out").unwrap();
+            word_list_container.class_list().add_1("scale-in").unwrap();
             let collections = document.get_element_by_id("word-list").expect("No \"word-list\" element found");
             
             let entries_html: Vec<std::boxed::Box<typed_html::elements::li<String>>> =
@@ -60,7 +37,7 @@ pub fn get_all_kanji() -> Result<Promise, JsValue> {
                         <li class="collection-item">
                             <div class="row">
                                 <div class="col s4 m2"><h5>{ text!( main_kanji ) }</h5><h6 class="grey-text">"READING"</h6></div>
-                                <div class="col s12 m8"><div class="flow-text">
+                                <div class="col s12 m8"><ol>
                                     {
                                         entry.senses().iter().filter_map(|sense| {
                                             let mut sense_string = String::new();
@@ -80,10 +57,10 @@ pub fn get_all_kanji() -> Result<Promise, JsValue> {
                                             }
                                         })
                                         .map(|sense_string| html!(
-                                            <p> { text!(sense_string) } </p>
+                                            <li class="flow-text"> { text!(sense_string) } </li>
                                         ))
                                     }
-                                </div></div>
+                                </ol></div>
                                 <div class="col s12 m2">
                                     <div class="col s12 m2"><span class="badge">"tag1"</span><span class="badge">"tag2"</span></div>
                                 </div>
@@ -111,9 +88,50 @@ pub fn get_all_kanji() -> Result<Promise, JsValue> {
                         let _ = collections.append_child(&new_element);
                     }
                 }
-            }
-            futures::future::ok(wasm_bindgen::JsValue::NULL)
-        });
-    Ok(wasm_bindgen_futures::future_to_promise(js_future))
+            };
+            futures::future::ok(())
+        }).map_err(|_| ());
+    wasm_bindgen_futures::spawn_local(js_future);
+    Ok(())
 }
 
+pub fn get_words<'a, S: Into<&'a str>, I: IntoIterator<Item = S>>(words_iterator: I) -> Result<impl Future<Item = Vec<JMDictEntry>, Error = JsValue>, JsValue>
+{
+    let mut _loading = JWordListLoading::lock();
+    let mut opts = RequestInit::new();
+    opts.method("POST");
+    opts.mode(RequestMode::SameOrigin);
+    {
+        let words: Vec<&str> = words_iterator.into_iter().map(Into::into).collect();
+        let words_json: String = serde_json::to_string(&words).map_err(|e| e.to_string())?;
+        opts.body(Some(&words_json.into()));
+    }
+
+    let request = Request::new_with_str_and_init(
+        "/api/get_words",
+        &opts,
+    )?;
+
+    request
+        .headers()
+        .set("Accept", "application/json")?;
+
+    let window = web_sys::window().expect("no global `window` exists");
+    let words_future = JsFuture::from(window.fetch_with_request(&request))
+        .and_then(move |resp_value| {
+            // `resp_value` is a `Response` object.
+            assert!(resp_value.is_instance_of::<Response>());
+            let resp: Response = resp_value.dyn_into().unwrap();
+            _loading = JWordListLoading::lock();
+            resp.json()
+        })
+        .and_then(|json_value: js_sys::Promise| {
+            // Convert this other `Promise` into a rust `Future`.
+            JsFuture::from(json_value)
+        })
+        .map(|json| -> Vec<JMDictEntry> {
+            // Use serde to parse the JSON into a struct.
+            json.into_serde().unwrap()
+        });
+    Ok(words_future)
+}

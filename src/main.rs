@@ -1,24 +1,29 @@
+use actix_web::web;
+use futures::future::Future;
+use futures::stream::Stream;
 use jmdict::prelude::*;
 use std::fs::File;
 use std::path::Path;
-mod config;
 use std::sync::Arc;
+mod config;
 use self::config::Config;
+mod error;
+use self::error::*;
 
 const CONFIG_FILENAME: &'static str = "jwordlist.yaml";
 
 fn main() -> std::io::Result<()> {
     let app = Arc::new(JWordListApp::initialize());
-    let app_data = actix_web::web::Data::new(Arc::clone(&app));
+    let app_data = web::Data::new(Arc::clone(&app));
     println!("Listening on http://{}", &app.config.listen_bind);
-    actix_web::HttpServer::new(
-        move || actix_web::App::new()
+    actix_web::HttpServer::new(move || {
+        actix_web::App::new()
             .register_data(app_data.clone())
-            .service(actix_web::web::resource("/api/get_all_kanji").to(get_all_kanji))
+            .service(web::resource("/api/get_words").route(web::post().to_async(get_words)))
             .service(actix_files::Files::new("/", "./static").index_file("index.html"))
-        )
-        .bind(&app.config.listen_bind)?
-        .run()
+    })
+    .bind(&app.config.listen_bind)?
+    .run()
 }
 
 struct JWordListApp {
@@ -57,20 +62,49 @@ impl JWordListApp {
         std::io::copy(&mut jmdict_file, &mut jmdict_memory_cursor)?;
         Ok(jmdict_memory)
     }
+    fn with_entries<'a, I: IntoIterator<Item = JMDictEntryId<'a>>, F: FnMut(JMDictEntry)>(
+        &self,
+        entries_iter: I,
+        f: F,
+    ) -> usize {
+        jmdict::with_jmdict_gz_entries(std::io::Cursor::new(&self.jmdict_memory), entries_iter, f)
+    }
 }
 
-fn get_all_kanji(state: actix_web::web::Data<Arc<JWordListApp>>, _req: actix_web::HttpRequest) -> actix_web::Result<actix_web::HttpResponse> {
-    let jwordlistapp: &JWordListApp = &state;
-    let mut entry_list = Vec::new();
-    jmdict::with_jmdict_gz_entries(
-        std::io::Cursor::new(&jwordlistapp.jmdict_memory),
-        JMDictEntryId::from_kanjis(vec!["言葉", "辞典"]),
-        |e| {
-            entry_list.push(e);
-        },
-    );
-    let json_string = serde_json::to_string(&entry_list)?;
-    Ok(actix_web::HttpResponse::Ok()
-        .header(actix_web::http::header::CONTENT_TYPE, "application/json")
-        .body(json_string))
+fn get_words(
+    state: web::Data<Arc<JWordListApp>>,
+    payload: web::Payload,
+) -> impl Future<Item = actix_web::HttpResponse, Error = actix_web::error::Error> {
+    payload
+        .from_err()
+        .fold(web::BytesMut::new(), |mut body, chunk| {
+            body.extend_from_slice(&chunk);
+            Result::<web::BytesMut, actix_web::error::Error>::Ok(body)
+        })
+        .and_then(move |body| {
+            use std::collections::HashMap;
+            let entries_id_string_total: &str =
+                std::str::from_utf8(&body).map_err(JWordListErrorResponse::from)?;
+            let entries_id_strings: Vec<&str> = serde_json::from_str(&entries_id_string_total)
+                .map_err(JWordListErrorResponse::from)?;
+            let jwordlistapp: &JWordListApp = &state;
+            let entries: Vec<JMDictEntryId> = entries_id_strings
+                .iter()
+                .map(|&kanji_string| JMDictEntryId::from_kanji(kanji_string))
+                .collect();
+            let mut entries_map: HashMap<JMDictEntryId, JMDictEntry> = Default::default();
+            jwordlistapp.with_entries(entries.clone(), |e| {
+                entries_map.insert(e.entry_id().clone().into_owned(), e.clone());
+            });
+            // reorder according to the original order
+            let entry_list: Vec<&JMDictEntry> = entries
+                .iter()
+                .filter_map(|id| entries_map.get(id))
+                .collect();
+            let json_string =
+                serde_json::to_string(&entry_list).map_err(JWordListErrorResponse::from)?;
+            Ok(actix_web::HttpResponse::Ok()
+                .header(actix_web::http::header::CONTENT_TYPE, "application/json")
+                .body(json_string))
+        })
 }

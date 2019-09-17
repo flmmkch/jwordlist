@@ -1,7 +1,7 @@
 use super::JMDictEntryId;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct JMDictEntry {
     entry_id: JMDictEntryId<'static>,
     kanji_list: Vec<Kanji>,
@@ -26,6 +26,9 @@ impl JMDictEntry {
             sense_list,
         }
     }
+    pub fn entry_id(&self) -> &JMDictEntryId {
+        &self.entry_id
+    }
     pub fn kanji(&self) -> &[Kanji] {
         &self.kanji_list
     }
@@ -37,7 +40,7 @@ impl JMDictEntry {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Kanji(String);
 
 impl Kanji {
@@ -49,7 +52,7 @@ impl Kanji {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Reading(String);
 
 impl Reading {
@@ -61,7 +64,7 @@ impl Reading {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Sense {
     gloss_list: Vec<Gloss>,
 }
@@ -80,7 +83,7 @@ impl Sense {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Gloss(String, Option<String>);
 
 impl Gloss {

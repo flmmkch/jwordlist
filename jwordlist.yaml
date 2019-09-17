@@ -1,2 +1,2 @@
-jmdict_filename: "JMdict.gz"
+jmdict_filename: "data/JMdict.gz"
 listen_bind: "127.0.0.1:11000"
