@@ -25,7 +25,7 @@ make TARGET=release
 * Download the dictionary file (as a .gz) from https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project to the path specified in **jwordlist.yaml**
 
 ```bash
-cargo run --release
+cargo run --release -p jwordlist
 ```
 
 ### Debug mode with source file watching
@@ -34,12 +34,11 @@ cargo run --release
 
 ```
 cd front
-cargo watch -x run
+cargo watch -x 'run -p jwordlist'
 ```
 and
 ```bash
-cd front
-./build.sh --watch
+./build-front.sh --watch
 ```
 
 ## LICENSE

@@ -3,9 +3,9 @@ name = "jmdict"
 version = "0.1.0"
 authors = ["Victor Nivet <victor@saumon.ninja>"]
 edition = "2018"
-default-features = "reader"
 
 [features]
+default = ["reader"]
 reader = ["flate2", "quick-xml"]
 
 [dependencies]

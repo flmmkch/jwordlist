@@ -10,9 +10,6 @@ matrix:
   allow_failures:
     - rust: nightly
   fast_finish: true
-cache:
-  cargo: true
-  directories:
-    - front/target
+cache: cargo
 script:
   - make
