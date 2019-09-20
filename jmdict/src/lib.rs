@@ -155,15 +155,17 @@ pub fn with_jmdict_entries<
                                         .attributes()
                                         .filter_map(Result::ok)
                                         .filter(|a| a.key == ATTR_GLOSS_LANG)
-                                        .filter_map(|a| std::str::from_utf8(&a.value).map(String::from).ok())
+                                        .filter_map(|a| {
+                                            std::str::from_utf8(&a.value).map(String::from).ok()
+                                        })
                                         .next();
                                     if let Ok(gloss_text) =
                                         xml_reader.read_text(ELEM_GLOSS, &mut xml_buf)
                                     {
-                                        let gloss = if let Some(lang_attribute) = lang_attribute_opt {
+                                        let gloss = if let Some(lang_attribute) = lang_attribute_opt
+                                        {
                                             entry::Gloss::new_with_lang(gloss_text, lang_attribute)
-                                        }
-                                        else {
+                                        } else {
                                             entry::Gloss::new(gloss_text)
                                         };
                                         current_sense.add_gloss(gloss);

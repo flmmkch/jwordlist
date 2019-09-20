@@ -1,5 +1,5 @@
-use std::borrow::Cow;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 
 #[derive(Clone, Debug, Deserialize, Serialize, Hash, PartialEq, Eq)]
 pub enum JMDictEntryId<'a> {
@@ -18,7 +18,9 @@ impl<'a> JMDictEntryId<'a> {
     }
     pub fn into_owned(self) -> JMDictEntryId<'static> {
         match self {
-            JMDictEntryId::Kanji(my_kanji_string) => JMDictEntryId::Kanji(Cow::Owned(my_kanji_string.into_owned())),
+            JMDictEntryId::Kanji(my_kanji_string) => {
+                JMDictEntryId::Kanji(Cow::Owned(my_kanji_string.into_owned()))
+            }
         }
     }
 }
