@@ -56,8 +56,13 @@
         <br>
         <div class="collection" id="word-list">
         </div>
-        <div style="width: 100%; display: flex; align-items: center; justify-content: center;">
-            <a class="btn-floating btn-large waves-effect waves-light teal" href="#!"><i class="material-icons">add</i></a>
+        <div id="add-words-trigger" style="width: 100%; display: flex; align-items: center; justify-content: center;">
+            <form enctype="multipart/form-data" method="post" name="add-words-form">
+                <div id="add-words-fields"></div>
+                <button class="btn-floating btn-large waves-effect waves-light teal" type="submit" name="add-words-action">
+                    <i class="material-icons right">add</i>
+                </button>
+            </form>
         </div>
     </div>
     <br>

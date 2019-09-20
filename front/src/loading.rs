@@ -1,5 +1,5 @@
-use wasm_bindgen::prelude::*;
 use std::marker::PhantomData;
+use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen(module = "/js/loading.js")]
 extern "C" {

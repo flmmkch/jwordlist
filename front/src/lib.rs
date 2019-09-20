@@ -1,13 +1,17 @@
-#![recursion_limit="512"]
-use wasm_bindgen::prelude::*;
-use web_sys::{Request, RequestInit, RequestMode, Response};
-use wasm_bindgen_futures::JsFuture;
+#![recursion_limit = "512"]
 use futures::future::Future;
 use jmdict::prelude::*;
-use wasm_bindgen::JsCast;
 use std::panic;
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{Request, RequestInit, RequestMode, Response};
 mod loading;
 use self::loading::JWordListLoading;
+mod add_words;
+mod display_word_list;
+mod js_util;
+mod storage;
 
 // Called when the wasm module is instantiated
 #[wasm_bindgen(start)]
@@ -18,103 +22,40 @@ pub fn main() -> Result<(), JsValue> {
 }
 
 pub fn initialize_app() -> Result<(), JsValue> {
-    let js_future = get_words(vec!["言葉", "辞典", "映画館"])?
-        .and_then(|entry_list| {
-            use typed_html::{html, text};
-            let window = web_sys::window().expect("no global window exists");
-            let document = window.document().expect("no window document found");
-            let word_list_container = document.get_element_by_id("word-list-container").expect("No \"word-list-container\" element found");
-            word_list_container.class_list().remove_1("scale-out").unwrap();
-            word_list_container.class_list().add_1("scale-in").unwrap();
-            let collections = document.get_element_by_id("word-list").expect("No \"word-list\" element found");
-            
-            let entries_html: Vec<std::boxed::Box<typed_html::elements::li<String>>> =
-                entry_list.iter().map(|entry| {
-                    let main_kanji: &str = entry.kanji().first().map(jmdict::entry::Kanji::string).unwrap_or("");
-                    let jisho_url = url::Url::parse("https://jisho.org/word/").and_then(|u| u.join(&main_kanji)).map(|u| String::from(u.as_str())).unwrap_or("#!".into());
-                    let tangorin_url = url::Url::parse("https://tangorin.com/words/").and_then(|u| u.join(&main_kanji)).map(|u| String::from(u.as_str())).unwrap_or("#!".into());
-                    html! {
-                        <li class="collection-item">
-                            <div class="row">
-                                <div class="col s4 m2"><h5>{ text!( main_kanji ) }</h5><h6 class="grey-text">"READING"</h6></div>
-                                <div class="col s12 m8"><ol>
-                                    {
-                                        entry.senses().iter().filter_map(|sense| {
-                                            let mut sense_string = String::new();
-                                            let mut separator = "";
-                                            let mut has_english = false;
-                                            for gloss in sense.glosses() {
-                                                sense_string.push_str(separator);
-                                                sense_string.push_str(gloss.text());
-                                                separator = "; ";
-                                                has_english = has_english || gloss.lang().is_none();
-                                            }
-                                            if has_english {
-                                                Some(sense_string)
-                                            }
-                                            else {
-                                                None
-                                            }
-                                        })
-                                        .map(|sense_string| html!(
-                                            <li class="flow-text"> { text!(sense_string) } </li>
-                                        ))
-                                    }
-                                </ol></div>
-                                <div class="col s12 m2">
-                                    <div class="col s12 m2"><span class="badge">"tag1"</span><span class="badge">"tag2"</span></div>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col s4"><a class="waves-effect waves-light btn-small teal" target="_blank" href={ &jisho_url }>"Jisho"</a></div>
-                                <div class="col s4"><a class="waves-effect waves-light btn-small teal" target="_blank" href={ &tangorin_url }>"Tangorin"</a></div>
-                            </div>
-                        </li>
-                    }
-                })
-                .collect();
-
-            {
-                let word_count = document.get_element_by_id("word-count").expect("No \"word-count\" element found");
-                word_count.set_text_content(Some(&entry_list.len().to_string()));
-            }
-
-            collections.set_inner_html("");
-            let dom_parser = web_sys::DomParser::new().unwrap();
-            for entry_html in entries_html {
-                let entry_string: String = entry_html.to_string();
-                if let Ok(new_document) = dom_parser.parse_from_string(&entry_string, web_sys::SupportedType::TextHtml) {
-                    if let Some(new_element) = new_document.children().get_with_index(0) {
-                        let _ = collections.append_child(&new_element);
-                    }
-                }
-            };
-            futures::future::ok(())
-        }).map_err(|_| ());
-    wasm_bindgen_futures::spawn_local(js_future);
+    use storage::WordStorage;
+    add_words::setup_add_words()?;
+    let stored_words = storage::WindowLocalStorage().get_stored_entry_ids()?;
+    add_words::add_word_form_init()?;
+    if stored_words.is_empty() {
+        // ask for new words
+        display_word_list::display_word_list(&[])?;
+        add_words::focus_next_add_word_field()?;
+    } else {
+        // display initial words
+        let js_future = get_words(stored_words)?
+            .and_then(display_word_list)
+            .map_err(js_util::map_js_err_to_unit);
+        wasm_bindgen_futures::spawn_local(js_future);
+    }
     Ok(())
 }
 
-pub fn get_words<'a, S: Into<&'a str>, I: IntoIterator<Item = S>>(words_iterator: I) -> Result<impl Future<Item = Vec<JMDictEntry>, Error = JsValue>, JsValue>
-{
+pub fn get_words<'a, I: IntoIterator<Item = JMDictEntryId<'a>>>(
+    words_iterator: I,
+) -> Result<impl Future<Item = Vec<JMDictEntry>, Error = JsValue>, JsValue> {
     let mut _loading = JWordListLoading::lock();
     let mut opts = RequestInit::new();
     opts.method("POST");
     opts.mode(RequestMode::SameOrigin);
     {
-        let words: Vec<&str> = words_iterator.into_iter().map(Into::into).collect();
+        let words: Vec<_> = words_iterator.into_iter().collect();
         let words_json: String = serde_json::to_string(&words).map_err(|e| e.to_string())?;
         opts.body(Some(&words_json.into()));
     }
 
-    let request = Request::new_with_str_and_init(
-        "/api/get_words",
-        &opts,
-    )?;
+    let request = Request::new_with_str_and_init("/api/get_words", &opts)?;
 
-    request
-        .headers()
-        .set("Accept", "application/json")?;
+    request.headers().set("Accept", "application/json")?;
 
     let window = web_sys::window().expect("no global `window` exists");
     let words_future = JsFuture::from(window.fetch_with_request(&request))
@@ -134,4 +75,13 @@ pub fn get_words<'a, S: Into<&'a str>, I: IntoIterator<Item = S>>(words_iterator
             json.into_serde().unwrap()
         });
     Ok(words_future)
+}
+
+pub fn display_word_list<S: AsRef<[JMDictEntry]>>(
+    entry_list: S,
+) -> impl Future<Item = (), Error = JsValue> {
+    match display_word_list::display_word_list(entry_list.as_ref()) {
+        Ok(()) => futures::future::ok(()),
+        Err(e) => futures::future::err(e),
+    }
 }

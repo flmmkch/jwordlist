@@ -85,19 +85,15 @@ fn get_words(
             use std::collections::HashMap;
             let entries_id_string_total: &str =
                 std::str::from_utf8(&body).map_err(JWordListErrorResponse::from)?;
-            let entries_id_strings: Vec<&str> = serde_json::from_str(&entries_id_string_total)
+            let entry_ids: Vec<JMDictEntryId> = serde_json::from_str(&entries_id_string_total)
                 .map_err(JWordListErrorResponse::from)?;
             let jwordlistapp: &JWordListApp = &state;
-            let entries: Vec<JMDictEntryId> = entries_id_strings
-                .iter()
-                .map(|&kanji_string| JMDictEntryId::from_kanji(kanji_string))
-                .collect();
             let mut entries_map: HashMap<JMDictEntryId, JMDictEntry> = Default::default();
-            jwordlistapp.with_entries(entries.clone(), |e| {
+            jwordlistapp.with_entries(entry_ids.iter().cloned(), |e| {
                 entries_map.insert(e.entry_id().clone().into_owned(), e.clone());
             });
             // reorder according to the original order
-            let entry_list: Vec<&JMDictEntry> = entries
+            let entry_list: Vec<&JMDictEntry> = entry_ids
                 .iter()
                 .filter_map(|id| entries_map.get(id))
                 .collect();
