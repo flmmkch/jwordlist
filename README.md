@@ -7,27 +7,39 @@ To use it, download JMDict data (as gz) from https://www.edrdg.org/wiki/index.ph
 ## Installation
 
 Requirements:
-* cargo
+* cargo to compile Rust: https://rustup.rs/
+* the wasm32-unknown-unknown target for Rust webassembly support: `rustup target add wasm32-unknown-unknown`
+* wasm-bindgen-cli for Rust webassembly support: `cargo install -f wasm-bindgen-cli`
+
+### Compiling
+
+Simply use the Makefile provided in the repository to compile the project.
 
 ```bash
-cd jwordlist
-./build.sh --release
-cd ..
+make
+```
+
+### Running
+
+* Edit **jwordlist.yaml** according to your needs.
+* Download the dictionary file (as a .gz) from https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project to the path specified in **jwordlist.yaml**
+
+```bash
 cargo run --release
 ```
 
-To watch the project:
+### Debug mode with source file watching
+
 * cargo-watch: `bash cargo install -f watch`
 
-### Frontend
+```
+cd front
+cargo watch -x run
+```
+and
 ```bash
 cd front
-./build.sh --release --watch
-```
-
-### Backend
-```bash
-cargo watch -x 'run --release'
+./build.sh --watch
 ```
 
 ## LICENSE
