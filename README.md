@@ -16,7 +16,7 @@ Requirements:
 Simply use the Makefile provided in the repository to compile the project.
 
 ```bash
-make
+make TARGET=release
 ```
 
 ### Running
