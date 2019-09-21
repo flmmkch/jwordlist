@@ -2,20 +2,23 @@ use futures::future::Future;
 use jmdict::prelude::*;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
+use std::cell::RefCell;
+
+thread_local! {
+    static SUBMIT_CLOSURE: RefCell<Closure<dyn FnMut() -> bool>> = RefCell::new(Closure::wrap(Box::new(|| action_submit().unwrap()) as Box<dyn FnMut() -> bool>));
+}
 
 pub fn add_word_form_init() -> Result<(), JsValue> {
     let window = web_sys::window().unwrap();
     let document = window.document().unwrap();
     // set add words action
-    {
+    SUBMIT_CLOSURE.with(|closure| -> Result<(), JsValue> {
         let add_words_submit_collection = document.get_elements_by_name("add-words-action");
-        let submit_closure =
-            Closure::wrap(Box::new(|| action_submit().unwrap()) as Box<dyn FnMut() -> bool>);
         for add_words_submit in super::js_util::node_list_iter(add_words_submit_collection) {
-            configure_submit(add_words_submit, &submit_closure)?;
+            configure_submit(add_words_submit, &closure.borrow())?;
         }
-        submit_closure.forget();
-    }
+        Ok(())
+    })?;
     // add the fields to the form
     add_word_fields_reset()?;
     Ok(())
