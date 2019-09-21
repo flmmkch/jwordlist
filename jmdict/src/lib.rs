@@ -1,3 +1,5 @@
+#[macro_use]
+extern crate lazy_static;
 use std::io::prelude::*;
 
 pub mod entry_id;
@@ -67,7 +69,7 @@ pub fn with_jmdict_entries<
     let mut entry_kanji: Vec<entry::Kanji> = Vec::new();
     let mut entry_reading: Vec<entry::Reading> = Vec::new();
     let mut entry_sense: Vec<entry::Sense> = Vec::new();
-    let mut _keywords = Vec::new();
+    let mut keywords = KeywordList::new();
     loop {
         const ELEM_ENTRY: &'static [u8] = b"entry";
         const ELEM_KANJI: &'static [u8] = b"k_ele";
@@ -201,7 +203,7 @@ pub fn with_jmdict_entries<
                 entry_sense = Vec::new();
             }
             Ok(Event::DocType(ref doctype_buffer)) => {
-                _keywords = read_keywords(doctype_buffer);
+                keywords = read_keywords(doctype_buffer);
             }
             Ok(Event::Eof) => break,
             Err(e) => panic!(
@@ -216,31 +218,31 @@ pub fn with_jmdict_entries<
     total_entry_count
 }
 
-struct KeywordDefinition {
-    keyword: String,
-    definition: String,
-}
+type KeywordList = std::collections::BTreeMap<String, String>;
 
-fn read_keywords(doctype_buffer: &[u8]) -> Vec<KeywordDefinition> {
+fn read_keywords(doctype_buffer: &[u8]) -> KeywordList {
+    use regex::Regex;
     use std::io::{BufReader, Cursor};
     let cursor = Cursor::new(doctype_buffer);
     let buf_reader = BufReader::new(cursor);
-    let keywords = Vec::new();
+    let mut keywords = KeywordList::new();
+    lazy_static! {
+        static ref RE: Regex = Regex::new(r#"<!ENTITY (\w+) "([^"]*)">"#).unwrap();
+    }
     for line_res in buf_reader.lines() {
         match line_res {
             Ok(line) => {
-                // TODO
-                /*
-                if line.starts_with(ENTITY_START_STRING) {
-                    let keyword: String;
-                    let definition: String;
-                    keyword = line.substr(ENTITY_START_STRING.len())
-                    keywords.push(KeywordDefinition {
-                        keyword,
-                        definition,
-                    });
+                if let Some(captures) = RE.captures(&line) {
+                    if let Some((keyword, definition)) = captures
+                        .get(1)
+                        .iter()
+                        .zip(captures.get(2))
+                        .map(|(k, d)| (String::from(k.as_str()), String::from(d.as_str())))
+                        .next()
+                    {
+                        keywords.insert(keyword, definition);
+                    }
                 }
-                */
             }
             Err(e) => panic!("Error reading keyword: {}", e),
         }

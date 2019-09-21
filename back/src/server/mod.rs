@@ -77,14 +77,18 @@ fn get_words(
             let entry_ids: Vec<JMDictEntryId> = serde_json::from_str(&entries_id_string_total)
                 .map_err(JWordListErrorResponse::from)?;
             let jwordlistapp: &JWordListApp = &state;
-            let mut entries_map: HashMap<JMDictEntryId, JMDictEntry> = Default::default();
+            let mut entries_map: HashMap<JMDictEntryId, Vec<JMDictEntry>> = Default::default();
             jwordlistapp.with_entries(entry_ids.iter().cloned(), |e| {
-                entries_map.insert(e.entry_id().clone().into_owned(), e.clone());
+                let entry = entries_map
+                    .entry(e.entry_id().clone().into_owned())
+                    .or_insert(Vec::new());
+                entry.push(e);
             });
             // reorder according to the original order
             let entry_list: Vec<&JMDictEntry> = entry_ids
                 .iter()
                 .filter_map(|id| entries_map.get(id))
+                .flatten()
                 .collect();
             let json_string =
                 serde_json::to_string(&entry_list).map_err(JWordListErrorResponse::from)?;
