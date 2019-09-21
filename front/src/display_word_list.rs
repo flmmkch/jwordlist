@@ -58,8 +58,13 @@ pub fn display_word_list(entry_list: &[JMDictEntry]) -> Result<(), JsValue> {
         .collect();
 
     {
-        let word_count = document.get_element_by_id("word-count").unwrap();
-        word_count.set_text_content(Some(&entry_list.len().to_string()));
+        let word_count = entry_list.len();
+        let word_count_string = match word_count {
+            1 => format!("{} word", word_count),
+            _ => format!("{} words", word_count),
+        };
+        let word_count_element = document.get_element_by_id("word-count").unwrap();
+        word_count_element.set_text_content(Some(&word_count_string));
     }
 
     collections.set_inner_html("");
