@@ -40,7 +40,9 @@ fn main() -> Result<(), Error> {
             (None, Some(update_dict::DICT_FILENAME_EN)) => update_dict::DICT_URL_ENGLISH,
             (None, other_filename) => panic!("Unable to determine dictionary URL for \"{}\": use a dictionary with \"JMDict.gz\" or \"JMDict_e.gz\" as filename, or add --dict-url argument", other_filename.unwrap_or_default()),
         };
-        update_dict::update_dict(update_url, &config)?;
+        if let Err(e) = update_dict::update_dict(update_url, &config) {
+            eprintln!("Failed to update dictionary: {}", e);
+        }
     }
     // run the server
     server::run_server(config)?;
@@ -51,7 +53,7 @@ fn main() -> Result<(), Error> {
 pub enum Error {
     IoError(std::io::Error),
     ReqwestError(reqwest::Error),
-    Other(Box<dyn std::error::Error>),
+    Other(Box<dyn std::error::Error + 'static>),
 }
 
 impl From<std::io::Error> for Error {
@@ -69,6 +71,25 @@ impl From<reqwest::Error> for Error {
 #[allow(dead_code)]
 impl Error {
     pub fn from_other<E: std::error::Error + 'static>(error: E) -> Self {
-        Self::Other(Box::new(error) as Box<dyn std::error::Error>)
+        Self::Other(Box::new(error))
+    }
+    pub fn with_error<'a, T, F: FnOnce(&'a dyn std::error::Error) -> T>(&'a self, f: F) -> T {
+        match self {
+            Error::IoError(e) => f(e),
+            Error::ReqwestError(e) => f(e),
+            Error::Other(e) => f(e.as_ref()),
+        }
+    }
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        self.with_error(|e| std::fmt::Display::fmt(e, f))
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.with_error(|e| e.source())
     }
 }
