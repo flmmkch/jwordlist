@@ -53,7 +53,7 @@ pub fn get_words<'a, I: IntoIterator<Item = JMDictEntryId<'a>>>(
         opts.body(Some(&words_json.into()));
     }
 
-    let request = Request::new_with_str_and_init("/api/get_words", &opts)?;
+    let request = Request::new_with_str_and_init("api/get_words", &opts)?;
 
     request.headers().set("Accept", "application/json")?;
 
