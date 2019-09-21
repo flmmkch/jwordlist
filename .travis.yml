@@ -5,11 +5,19 @@ rust:
   - nightly
 before_install:
   - rustup target add wasm32-unknown-unknown
-  - cargo install -f wasm-bindgen-cli
+  - cargo install wasm-bindgen-cli
 matrix:
   allow_failures:
     - rust: nightly
   fast_finish: true
-cache: cargo
+# Source: https://levans.fr/rust_travis_cache.html
+# Need to cache the whole `.cargo` directory to keep .crates.toml for
+# cargo-update to work
+cache:
+  directories:
+    - $TRAVIS_HOME/.cargo
+# But don't cache the cargo registry
+before_cache:
+  - rm -rf "$TRAVIS_HOME/.cargo/registry"
 script:
   - make
