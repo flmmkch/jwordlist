@@ -1,9 +1,9 @@
-use clap::{Arg, App};
+use clap::{App, Arg};
 use std::fs::File;
 mod config;
+mod error;
 mod server;
 mod update_dict;
-mod error;
 use error::Error;
 
 fn main() -> Result<(), Error> {
@@ -11,23 +11,34 @@ fn main() -> Result<(), Error> {
         .version("0.1.0")
         .author("Victor Nivet <victor@saumon.ninja>")
         .about("A Japanese vocabulary list web app")
-        .arg(Arg::with_name("dict-update")
-            .long("dict-update")
-            .help("Update the dictionary file"))
-        .arg(Arg::with_name("dict-url")
-            .long("dict-url")
-            .requires("dict-update")
-            .takes_value(true)
-            .help("Dictionary file update URL"))
-        .arg(Arg::with_name("config")
-            .long("configuration")
-            .value_name("FILE")
-            .default_value(config::CONFIG_FILENAME)
-            .help("Sets a custom config file")
-            .takes_value(true))
+        .arg(
+            Arg::with_name("dict-update")
+                .long("dict-update")
+                .help("Update the dictionary file"),
+        )
+        .arg(
+            Arg::with_name("dict-url")
+                .long("dict-url")
+                .requires("dict-update")
+                .takes_value(true)
+                .help("Dictionary file update URL"),
+        )
+        .arg(
+            Arg::with_name("config")
+                .long("configuration")
+                .value_name("FILE")
+                .default_value(config::CONFIG_FILENAME)
+                .help("Sets a custom config file")
+                .takes_value(true),
+        )
         .get_matches();
-    let config_filename: std::path::PathBuf = matches.value_of_os("config").map(std::ffi::OsStr::to_os_string).unwrap_or_else(|| std::ffi::OsString::from(config::CONFIG_FILENAME)).into();
-    let config: config::Config = serde_yaml::from_reader(File::open(&config_filename).expect(&format!(
+    let config_filename: std::path::PathBuf = matches
+        .value_of_os("config")
+        .map(std::ffi::OsStr::to_os_string)
+        .unwrap_or_else(|| std::ffi::OsString::from(config::CONFIG_FILENAME))
+        .into();
+    let config: config::Config =
+        serde_yaml::from_reader(File::open(&config_filename).expect(&format!(
             "Unable to open config file {} for reading",
             config_filename.display()
         )))

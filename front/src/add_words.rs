@@ -1,8 +1,8 @@
 use futures::future::Future;
 use jmdict::prelude::*;
+use std::cell::RefCell;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use std::cell::RefCell;
 
 thread_local! {
     static SUBMIT_CLOSURE: RefCell<Closure<dyn FnMut() -> bool>> = RefCell::new(Closure::wrap(Box::new(|| action_submit().unwrap()) as Box<dyn FnMut() -> bool>));

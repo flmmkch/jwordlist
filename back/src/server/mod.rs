@@ -40,8 +40,8 @@ impl JWordListApp {
         }
     }
     fn load_jmdict_to_memory(jmdict_path: &Path) -> Result<Vec<u8>, std::io::Error> {
-        use std::io::Cursor;
         use std::fs::File;
+        use std::io::Cursor;
         use std::io::{Seek, SeekFrom};
         let mut jmdict_file = File::open(jmdict_path)?;
         let total_size = jmdict_file.seek(SeekFrom::End(0))?;
