@@ -23,9 +23,11 @@ pub fn main() -> Result<(), JsValue> {
 
 pub fn initialize_app() -> Result<(), JsValue> {
     use storage::WordStorage;
+    // initial loading bar
     add_words::setup_add_words()?;
     let stored_words = storage::WindowLocalStorage().get_stored_entry_ids()?;
     add_words::add_word_form_init()?;
+    let _ = JWordListLoading::lock();
     if stored_words.is_empty() {
         // ask for new words
         display_word_list::display_word_list(&[])?;
