@@ -1,5 +1,13 @@
 use jmdict::prelude::*;
 use wasm_bindgen::prelude::*;
+use percent_encoding::{percent_encode, AsciiSet, CONTROLS};
+
+/// https://url.spec.whatwg.org/#fragment-percent-encode-set
+const ASCII_SET_FRAGMENT: &AsciiSet = &CONTROLS.add(b' ').add(b'"').add(b'<').add(b'>').add(b'`');
+
+fn make_word_url(base_url: &str, word: &str) -> String {
+    format!("{}{}", base_url, percent_encode(word.as_bytes(), ASCII_SET_FRAGMENT).to_string())
+}
 
 pub fn display_word_list(entry_list: &[JMDictEntry]) -> Result<(), JsValue> {
     use typed_html::{html, text};
@@ -14,8 +22,8 @@ pub fn display_word_list(entry_list: &[JMDictEntry]) -> Result<(), JsValue> {
         entry_list.iter().map(|entry| {
             let main_kanji: &str = entry.kanji().first().map(jmdict::entry::Kanji::string).unwrap_or("");
             let main_reading: &str = entry.readings().first().map(jmdict::entry::Reading::string).unwrap_or("");
-            let jisho_url = url::Url::parse("https://jisho.org/word/").and_then(|u| u.join(&main_kanji)).map(|u| String::from(u.as_str())).unwrap_or("#!".into());
-            let tangorin_url = url::Url::parse("https://tangorin.com/words/").and_then(|u| u.join(&main_kanji)).map(|u| String::from(u.as_str())).unwrap_or("#!".into());
+            let jisho_url = make_word_url("https://jisho.org/word/", main_kanji);
+            let tangorin_url = make_word_url("https://tangorin.com/words/", main_kanji);
             html! {
                 <li class="collection-item">
                     <div class="row">
